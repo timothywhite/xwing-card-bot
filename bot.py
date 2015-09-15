@@ -1,43 +1,9 @@
 import praw
-import requests
 import re
 
 import config
-
-class XWingAPI:
-
-    def __init__(self, base_url):
-        self.pilots = []
-        self.upgrades = []
-        self.cards = []
-        self.base_url = base_url
-    
-    def get_card(self, name):
-        cards = filter(lambda c: self.compare(name, c), self.get_cards())
-        if len(cards) > 0:
-            return cards[0]
-        else:
-            return False
-    
-    def get_cards(self):
-        if len(self.cards) == 0:
-            self.cards = self.get_pilots() + self.get_upgrades()
-	return self.cards
-    def get_pilots(self):
-        if len(self.pilots) == 0:
-            r = requests.get(self.base_url + '/pilot')
-            self.pilots = r.json()
-        return self.pilots
-    
-    def get_upgrades(self):
-        if len(self.upgrades) == 0:
-            r = requests.get(self.base_url + '/upgrade')
-            self.upgrades = r.json()
-        return self.upgrades
-    
-    def compare(self, name, card):
-        return card['name'].lower() == name.lower()
-    
+from xwingapi import XWingAPI
+ 
 class XWingTMGCardBot:
     
     def __init__(self, config):
@@ -49,12 +15,14 @@ class XWingTMGCardBot:
         self.sub = self.reddit.get_subreddit(config.subreddit)
         self.posts = self.sub.get_hot(limit=config.post_limit)
         
+        self.stats =  ['attack', 'energy', 'range', 'agility', 'hull', 'shield', 'points']
+        
     def replied_to(self, obj):
         replies = []
         if type(obj) == praw.objects.Comment:
             replies = obj.replies
         elif type(obj) == praw.objects.Submission:
-            obj.comments
+            replies = obj.comments
         else:
             raise TypeException('Object not submission or comment')
             
@@ -64,22 +32,72 @@ class XWingTMGCardBot:
         return comment.author.name == config.username
     
     def parse_text(self, text):
-        r = re.compile('\[\[[^\]]+\]\]')
-        return [s.strip('[]').strip() for s in r.findall(text)]
+        tagRe = re.compile('\[\[[^\]]*\]\]')
+        typeRe = re.compile('\(\([^\)]*\)\)')
+        tags = [s.strip('[]').strip() for s in tagRe.findall(text)]
+        return [(re.sub(typeRe, '', t).strip(), re.search(typeRe, t).group().strip('()').strip()) if re.search(typeRe, t) else (t, '') for t in tags]
+    
+    def get_statline(self, card):
+        statline = {}
+        for stat in self.stats:
+            val = ''
+            if stat in card and card[stat] is not None:
+                val = str(card[stat])
+            if val is '' and 'ship' in card:
+                ship = self.api.get_ship(card['ship'])
+                val = str(ship[stat])
+            if val != '' and (stat != 'energy' or val != '0') and (stat != 'range' or val != '1-3'):
+                statline[stat] = val
+        
+        return statline    
+    def render_card_text(self, card):
+        replacements = { '{STRONG}|{/STRONG}' : '**', '{EM}|{/EM}' : '*', '{BR}' : '' }
+        text = card['text']
+        for pattern, repl in replacements.iteritems():
+            text = re.sub(pattern, repl, text)
+        
+        return text
+    
+    def render_card(self, card):
+        ret = '**Name:** ' + card['name'] + '\n\n'
+        statline = self.get_statline(card)
+        type = ''
+        if 'type' in card:
+            type = self.api.get_upgrade_type(card['type'])['name']
+        else:
+            type = 'Pilot'
+	ret += '**Type:** ' + type + ' ' 
+        for stat in self.stats:
+            if stat in statline and (stat != 'energy' or statline[stat] != '0'):
+                ret += '**' + stat.capitalize() + ':** ' + statline[stat] + ' '
+        ret += '\n\n'
+        ret += self.render_card_text(card)
+        return ret
+    
+    def build_comment(self, tags):
+        comment = ''
+        for index, tag in enumerate(tags):
+            card = self.api.get_card(tag)
+            if card:
+                comment += self.render_card(card)
+            if index != len(tags) - 1:
+                comment += '\n\n&nbsp;\n\n---\n\n&nbsp;\n\n'
+        comment += '\n\n&nbsp;\n\n Am I popping too much Glitterstim? Message /u/forkmonkey88'
+        
+        return comment
     
     def mash_go(self):
         for post in self.posts:
             if not self.replied_to(post):
-                card_names = self.parse_text(post.selftext)
-                for name in card_names:
-                    print self.api.get_card(name)['text']
-            
+                card_tags = self.parse_text(post.selftext)
+                comment = self.build_comment(card_tags)
+                if comment != '':
+                    post.add_comment(comment)
             for comment in praw.helpers.flatten_tree(post.comments):
                 if not self.replied_to(comment) and not self.own_comment(comment):
-                    card_names = self.parse_text(comment.body)
-                    for name in card_names:
-                        print self.api.get_card(name)['text']
-
+                    card_tags = self.parse_text(comment.body)
+                    reply = self.build_comment(card_tags)
+                    if reply != '':
+                        comment.reply(reply)
 bot = XWingTMGCardBot(config)
 bot.mash_go()
-
