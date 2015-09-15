@@ -82,7 +82,8 @@ class XWingTMGCardBot:
                 comment += self.render_card(card)
             if index != len(tags) - 1:
                 comment += '\n\n&nbsp;\n\n---\n\n&nbsp;\n\n'
-        comment += '\n\n&nbsp;\n\n Am I popping too much Glitterstim? Message /u/forkmonkey88'
+        if comment != '':
+            comment += '\n\n&nbsp;\n\n Am I popping too much Glitterstim? Message /u/forkmonkey88'
         
         return comment
     
