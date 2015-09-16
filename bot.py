@@ -127,6 +127,8 @@ class XWingTMGCardBot:
         return comment
 
     def post_comment(self, obj, comment):
+        print comment
+        return
         if type(obj) == praw.objects.Comment:
             return obj.reply(comment)
         elif type(obj) == praw.objects.Submission:
@@ -141,8 +143,8 @@ class XWingTMGCardBot:
                     comment = self.build_comment(post)
                     if comment:
                         self.post_comment(post, comment)
-                except Exception:
-                    print 'Unable to process post: ' + str(post)
+            except Exception:
+                print 'Unable to process post: ' + str(post)
             for comment in praw.helpers.flatten_tree(post.comments):
                 try:
                     if not self.replied_to(comment) and not self.own_comment(comment):
