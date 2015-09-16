@@ -142,6 +142,6 @@ class XWingTMGCardBot:
                             self.post_comment(comment, reply)
                 except Exception:
                     print 'Unable to process comment: ' + str(comment)
-
-bot = XWingTMGCardBot(config)
-bot.mash_go()
+if __name__ == '__main__':
+    bot = XWingTMGCardBot(config)
+    bot.mash_go()
