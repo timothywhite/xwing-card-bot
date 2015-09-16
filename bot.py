@@ -18,9 +18,9 @@ class XWingTMGCardBot:
 
         self.sub = self.reddit.get_subreddit(config.subreddit)
         self.posts = self.sub.get_hot(limit=config.post_limit)
-        
-        self.stats =  ['attack', 'energy', 'range', 'agility', 'hull', 'shield', 'points']
-        
+
+        self.stats =  ['skill', 'attack', 'energy', 'range', 'agility', 'hull', 'shield', 'points']
+
     def replied_to(self, obj):
         replies = []
         if type(obj) == praw.objects.Comment:
@@ -29,12 +29,12 @@ class XWingTMGCardBot:
             replies = obj.comments
         else:
             raise TypeException('Object not submission or comment')
-            
+
         return any(reply.author.name == config.username for reply in replies)
-    
+
     def own_comment(self, comment):
         return comment.author.name == config.username
-    
+
     def parse_text(self, text):
         tagRe = '\[\[([^\]]*)\]\]'
         def parse_tag(tag_text):
@@ -53,11 +53,11 @@ class XWingTMGCardBot:
                     tag[subtag_type] = re.sub(r, r'\1', match.group()).strip()
                 else:
                     tag[subtag_type] = None
-                    
+
             return tag
-                    
+
         return [parse_tag(t) for t in re.findall(tagRe, text)]
-    
+
     def get_statline(self, card):
         statline = {}
         for stat in self.stats:
@@ -69,16 +69,16 @@ class XWingTMGCardBot:
                 val = str(ship[stat])
             if val != '' and (stat != 'energy' or val != '0') and (stat != 'range' or val != '1-3'):
                 statline[stat] = val
-        
-        return statline    
+
+        return statline
     def render_card_text(self, card):
         replacements = { '{STRONG}|{/STRONG}' : '**', '{EM}|{/EM}' : '*', '{BR}' : '' }
         text = card['text']
         for pattern, repl in replacements.iteritems():
             text = re.sub(pattern, repl, text)
-        
+
         return text
-    
+
     def render_card(self, card):
         ret = '**Name:** ' + card['name'] + '\n\n'
         statline = self.get_statline(card)
@@ -87,16 +87,26 @@ class XWingTMGCardBot:
             type = self.api.get_upgrade_type(card['type'])['name']
         else:
             type = 'Pilot'
-        ret += '**Type:** ' + type + ' ' 
+        ret += '**Type:** ' + type + ' '
         for stat in self.stats:
             if stat in statline and (stat != 'energy' or statline[stat] != '0'):
                 ret += '**' + stat.capitalize() + ':** ' + statline[stat] + ' '
         ret += '\n\n'
         ret += self.render_card_text(card)
         return ret
-    
-    def build_comment(self, tags):
+
+    def get_text(self, obj):
+        if type(obj) == praw.objects.Comment:
+            return obj.body
+        elif type(obj) == praw.objects.Submission:
+            return obj.selftext
+        else:
+            raise TypeException('Object not submission or comment')
+
+    def build_comment(self, post):
         comment = ''
+        tags = self.parse_text(self.get_text(post))
+
         for index, tag in enumerate(tags):
             card = self.api.get_card(tag)
             if card:
@@ -105,23 +115,35 @@ class XWingTMGCardBot:
                 comment += '\n\n&nbsp;\n\n---\n\n&nbsp;\n\n'
         if comment != '':
             comment += '\n\n&nbsp;\n\n Am I popping too much Glitterstim? Message /u/forkmonkey88'
-        
+
         return comment
-    
+    def post_comment(self, obj, comment):
+        print comment
+        return
+        if type(obj) == praw.objects.Comment:
+            return obj.reply(comment)
+        elif type(obj) == praw.objects.Submission:
+            return obj.add_comment(comment)
+        else:
+            raise TypeException('Object not submission or comment')
+
     def mash_go(self):
         for post in self.posts:
-            if not self.replied_to(post):
-                card_tags = self.parse_text(post.selftext)
-                comment = self.build_comment(card_tags)
-                if comment != '':
-                    post.add_comment(comment)
-                
+            try:
+                if not self.replied_to(post):
+                    comment = self.build_comment(post)
+                    if comment:
+                        self.post_comment(post, comment)
+            except Exception:
+                print 'Unable to process post: ' + str(post)
             for comment in praw.helpers.flatten_tree(post.comments):
-                if not self.replied_to(comment) and not self.own_comment(comment):
-                    card_tags = self.parse_text(comment.body)
-                    reply = self.build_comment(card_tags)
-                    if reply != '':
-                        comment.reply(reply)
-    
+                try:
+                    if not self.replied_to(comment) and not self.own_comment(comment):
+                        reply = self.build_comment(comment)
+                        if reply:
+                            self.post_comment(comment, reply)
+                except Exception:
+                    print 'Unable to process comment: ' + str(comment)
+
 bot = XWingTMGCardBot(config)
 bot.mash_go()
