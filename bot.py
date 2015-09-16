@@ -127,8 +127,6 @@ class XWingTMGCardBot:
         return comment
 
     def post_comment(self, obj, comment):
-        print comment
-        return
         if type(obj) == praw.objects.Comment:
             return obj.reply(comment)
         elif type(obj) == praw.objects.Submission:
