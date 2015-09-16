@@ -32,10 +32,27 @@ class XWingTMGCardBot:
         return comment.author.name == config.username
     
     def parse_text(self, text):
-        tagRe = re.compile('\[\[[^\]]*\]\]')
-        typeRe = re.compile('\(\([^\)]*\)\)')
-        tags = [s.strip('[]').strip() for s in tagRe.findall(text)]
-        return [(re.sub(typeRe, '', t).strip(), re.search(typeRe, t).group().strip('()').strip()) if re.search(typeRe, t) else (t, '') for t in tags]
+        tagRe = '\[\[([^\]]*)\]\]'
+        def parse_tag(tag_text):
+            subtags = {
+                'type': '\(\(([^\)]*)\)\)',
+                'faction': '\{\{([^\}]*)\}\}'
+            }
+            tag = {}
+            card = re.sub(tagRe, r'\1', tag_text)
+            card = reduce(lambda p, st: re.sub(subtags[st], '', p), subtags.keys(), card)
+            card = card.strip()
+            tag['card'] = card
+            for subtag_type, r in subtags.iteritems():
+                match = re.search(r, tag_text)
+                if match:
+                    tag[subtag_type] = re.sub(r, r'\1', match.group()).strip()
+                else:
+                    tag[subtag_type] = None
+                    
+            return tag
+                    
+        return [parse_tag(t) for t in re.findall(tagRe, text)]
     
     def get_statline(self, card):
         statline = {}
@@ -66,7 +83,7 @@ class XWingTMGCardBot:
             type = self.api.get_upgrade_type(card['type'])['name']
         else:
             type = 'Pilot'
-	ret += '**Type:** ' + type + ' ' 
+        ret += '**Type:** ' + type + ' ' 
         for stat in self.stats:
             if stat in statline and (stat != 'energy' or statline[stat] != '0'):
                 ret += '**' + stat.capitalize() + ':** ' + statline[stat] + ' '
@@ -94,11 +111,13 @@ class XWingTMGCardBot:
                 comment = self.build_comment(card_tags)
                 if comment != '':
                     post.add_comment(comment)
+                
             for comment in praw.helpers.flatten_tree(post.comments):
                 if not self.replied_to(comment) and not self.own_comment(comment):
                     card_tags = self.parse_text(comment.body)
                     reply = self.build_comment(card_tags)
                     if reply != '':
                         comment.reply(reply)
+    
 bot = XWingTMGCardBot(config)
 bot.mash_go()
