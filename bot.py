@@ -3,15 +3,19 @@ import re
 
 import config
 from xwingapi import XWingAPI
- 
+
 class XWingTMGCardBot:
-    
+
     def __init__(self, config):
         self.reddit = praw.Reddit(config.user_agent)
-        self.reddit.login(config.username, config.password, disable_warning=True)
-        
+        self.reddit.set_oauth_app_info(client_id=config.client_id,
+                                       client_secret=config.client_secret,
+                                       redirect_uri=config.redirect_uri)
+        access_information = self.reddit.refresh_access_information(config.refresh_token)
+        self.reddit.set_access_credentials(**access_information)
+
         self.api = XWingAPI(config.api_base_url)
-        
+
         self.sub = self.reddit.get_subreddit(config.subreddit)
         self.posts = self.sub.get_hot(limit=config.post_limit)
         
