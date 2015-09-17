@@ -20,7 +20,7 @@ class XWingTMGCardBot:
         self.posts = self.sub.get_hot(limit=config.post_limit)
 
         self.stats =  ['skill', 'attack', 'energy', 'range', 'agility', 'hull', 'shield', 'points']
-        
+
         self.card_limit = config.card_limit
         self.debug = config.debug
 
@@ -85,16 +85,19 @@ class XWingTMGCardBot:
     def render_card(self, card):
         ret = '**Name:** ' + card['name'] + '\n\n'
         statline = self.get_statline(card)
-        type = ''
-        if 'type' in card:
-            type = self.api.get_upgrade_type(card['type'])['name']
+
+        card_type = ''
+        if type(card['type']) is dict:
+            card_type = card['type']['name']
         else:
-            type = 'Pilot'
-        ret += '**Type:** ' + type + ' '
+            card_type = self.api.get_upgrade_type(card['type'])['name']
+        ret += '**Type:** ' + card_type.capitalize() + ' '
+
         for stat in self.stats:
             if stat in statline and (stat != 'energy' or statline[stat] != '0'):
                 ret += '**' + stat.capitalize() + ':** ' + statline[stat] + ' '
         ret += '\n\n'
+
         ret += self.render_card_text(card)
         return ret
 
@@ -133,7 +136,7 @@ class XWingTMGCardBot:
         if self.debug:
             print comment
             return
-        
+
         if type(obj) == praw.objects.Comment:
             return obj.reply(comment)
         elif type(obj) == praw.objects.Submission:
