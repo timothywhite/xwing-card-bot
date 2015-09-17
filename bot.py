@@ -20,6 +20,9 @@ class XWingTMGCardBot:
         self.posts = self.sub.get_hot(limit=config.post_limit)
 
         self.stats =  ['skill', 'attack', 'energy', 'range', 'agility', 'hull', 'shield', 'points']
+        
+        self.card_limit = config.card_limit
+        self.debug = config.debug
 
     def replied_to(self, obj):
         replies = []
@@ -103,21 +106,34 @@ class XWingTMGCardBot:
         else:
             raise TypeException('Object not submission or comment')
 
+    def get_cards(self, tags):
+        cards = [self.api.get_card(t) for t in tags] #get cards
+        cards = [c for ca in cards for c in ca] #flatten card list
+        cards = [i for n,i in enumerate(cards) if i not in cards[n+1:]] #remove duplicates
+        cards = sorted(cards, key=lambda c: c['name']) #sort by name
+
+        return cards[:self.card_limit]
+
     def build_comment(self, post):
         comment = ''
         tags = self.parse_text(self.get_text(post))
+        cards = self.get_cards(tags)
 
-        for index, tag in enumerate(tags):
-            card = self.api.get_card(tag)
-            if card:
-                comment += self.render_card(card)
-            if index != len(tags) - 1:
+        for index, card in enumerate(cards):
+            comment += self.render_card(card)
+            if index != len(cards) - 1:
                 comment += '\n\n&nbsp;\n\n---\n\n&nbsp;\n\n'
+
         if comment != '':
             comment += '\n\n&nbsp;\n\n Am I popping too much Glitterstim? Message /u/forkmonkey88'
 
         return comment
+
     def post_comment(self, obj, comment):
+        if self.debug:
+            print comment
+            return
+        
         if type(obj) == praw.objects.Comment:
             return obj.reply(comment)
         elif type(obj) == praw.objects.Submission:
@@ -142,7 +158,7 @@ class XWingTMGCardBot:
                             self.post_comment(comment, reply)
                 except Exception:
                     print 'Unable to process comment: ' + str(comment)
-            
+
 if __name__ == '__main__':
     bot = XWingTMGCardBot(config)
     bot.mash_go()
