@@ -30,11 +30,8 @@ class XWingAPI:
                     return False
 
                 filtered_cards = filter(filter_func, filtered_cards)
-            
-        if len(filtered_cards) > 0:
-            return filtered_cards
-
-        return cards
+                
+        return filtered_cards if len(filtered_cards) > 0 else cards
 
     def get_cards(self):
         if len(self.cards) == 0:

@@ -7,3 +7,4 @@ redirect_uri = 'the redirect uri in your Reddit OAuth2 app config'
 refresh_token = 'refresh token for the inteded bot user'
 post_limit = 10 #number of hot posts to parse
 api_base_url = 'baseurl for the xwing api' #see https://github.com/timothywhite/xwsb-api
+debug = False #set to True to print comments instead of posting them

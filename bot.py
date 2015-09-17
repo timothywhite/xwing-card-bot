@@ -20,6 +20,8 @@ class XWingTMGCardBot:
         self.posts = self.sub.get_hot(limit=config.post_limit)
 
         self.stats =  ['skill', 'attack', 'energy', 'range', 'agility', 'hull', 'shield', 'points']
+        
+        self.debug = config.debug
 
     def replied_to(self, obj):
         replies = []
@@ -127,6 +129,10 @@ class XWingTMGCardBot:
         return comment
 
     def post_comment(self, obj, comment):
+        if self.debug:
+            print comment
+            return
+        
         if type(obj) == praw.objects.Comment:
             return obj.reply(comment)
         elif type(obj) == praw.objects.Submission:
