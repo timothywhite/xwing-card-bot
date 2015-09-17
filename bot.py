@@ -21,6 +21,7 @@ class XWingTMGCardBot:
 
         self.stats =  ['skill', 'attack', 'energy', 'range', 'agility', 'hull', 'shield', 'points']
         
+        self.card_limit = config.card_limit
         self.debug = config.debug
 
     def replied_to(self, obj):
@@ -111,7 +112,7 @@ class XWingTMGCardBot:
         cards = [i for n,i in enumerate(cards) if i not in cards[n+1:]] #remove duplicates
         cards = sorted(cards, key=lambda c: c['name']) #sort by name
 
-        return cards
+        return cards[:self.card_limit]
 
     def build_comment(self, post):
         comment = ''
