@@ -20,7 +20,7 @@ class XWingTMGCardBot:
         self.posts = self.sub.get_hot(limit=config.post_limit)
 
         self.stats =  ['skill', 'attack', 'energy', 'range', 'agility', 'hull', 'shield', 'points']
-        
+
         self.card_limit = config.card_limit
         self.debug = config.debug
 
@@ -85,16 +85,19 @@ class XWingTMGCardBot:
     def render_card(self, card):
         ret = '**Name:** ' + card['name'] + '\n\n'
         statline = self.get_statline(card)
-        type = ''
-        if 'type' in card:
-            type = self.api.get_upgrade_type(card['type'])['name']
+
+        card_type = ''
+        if type(card['type']) is dict:
+            card_type = card['type']['name']
         else:
-            type = 'Pilot'
-        ret += '**Type:** ' + type + ' '
+            card_type = self.api.get_upgrade_type(card['type'])['name']
+        ret += '**Type:** ' + card_type.capitalize() + ' '
+
         for stat in self.stats:
             if stat in statline and (stat != 'energy' or statline[stat] != '0'):
                 ret += '**' + stat.capitalize() + ':** ' + statline[stat] + ' '
         ret += '\n\n'
+
         ret += self.render_card_text(card)
         return ret
 
@@ -133,7 +136,7 @@ class XWingTMGCardBot:
         if self.debug:
             print comment
             return
-        
+
         if type(obj) == praw.objects.Comment:
             return obj.reply(comment)
         elif type(obj) == praw.objects.Submission:
@@ -141,23 +144,28 @@ class XWingTMGCardBot:
         else:
             raise TypeException('Object not submission or comment')
 
+    def process(self, obj):
+        try:
+            should_process = not self.replied_to(obj)
+            if type(obj) == praw.objects.Comment:
+                should_process = should_process and not self.own_comment(obj)
+            else:
+                for comment in praw.helpers.flatten_tree(obj.comments):
+                    self.process(comment)
+
+            if should_process:
+                comment = self.build_comment(obj)
+                if comment:
+                    self.post_comment(obj, comment)
+                    
+        except Exception:
+            print 'Unable to process: ' + str(obj)
+            if self.debug:
+                raise
+
     def mash_go(self):
         for post in self.posts:
-            try:
-                if not self.replied_to(post):
-                    comment = self.build_comment(post)
-                    if comment:
-                        self.post_comment(post, comment)
-            except Exception:
-                print 'Unable to process post: ' + str(post)
-            for comment in praw.helpers.flatten_tree(post.comments):
-                try:
-                    if not self.replied_to(comment) and not self.own_comment(comment):
-                        reply = self.build_comment(comment)
-                        if reply:
-                            self.post_comment(comment, reply)
-                except Exception:
-                    print 'Unable to process comment: ' + str(comment)
+            self.process(post)
 
 if __name__ == '__main__':
     bot = XWingTMGCardBot(config)

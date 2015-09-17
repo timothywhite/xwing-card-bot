@@ -30,7 +30,7 @@ class XWingAPI:
                     return False
 
                 filtered_cards = filter(filter_func, filtered_cards)
-                
+
         return filtered_cards if len(filtered_cards) > 0 else cards
 
     def get_cards(self):
@@ -46,7 +46,16 @@ class XWingAPI:
         return self.cache[obj_type]
 
     def get_pilots(self):
-        return self.get_objs('pilot')
+        set_types = 'pilot' not in self.cache
+        pilots = self.get_objs('pilot')
+        def add_type(pilot):
+            pilot['type'] = {
+                'name': 'pilot'
+            }
+            return pilot
+        if set_types:
+            pilots = [add_type(p) for p in pilots]
+        return pilots
 
     def get_ships(self):
         return self.get_objs('ship')
