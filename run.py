@@ -11,11 +11,14 @@ def set_interval(func, sec):
     t.start()
     return t
 
+bot = XWingTMGCardBot(config)
+
 def mash_go():
     try:
-        bot = XWingTMGCardBot(config)
         bot.mash_go()
     except Exception:
         print 'Unable to process sumbissions'
+        if config.debug:
+            raise
 
 set_interval(mash_go, 60)
