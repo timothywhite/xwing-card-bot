@@ -7,22 +7,33 @@ from xwingapi import XWingAPI
 class XWingTMGCardBot:
 
     def __init__(self, config):
+        self.refresh_token = config.refresh_token
+        self.card_limit = config.card_limit
+        self.post_limit = config.post_limit
+        self.debug = config.debug
+        self.stats =  [
+            'skill',
+            'attack',
+            'energy',
+            'range',
+            'agility',
+            'hull',
+            'shield',
+            'points'
+        ]
+        self.api = XWingAPI(config.api_base_url)
         self.reddit = praw.Reddit(config.user_agent)
         self.reddit.set_oauth_app_info(client_id=config.client_id,
                                        client_secret=config.client_secret,
                                        redirect_uri=config.redirect_uri)
-        access_information = self.reddit.refresh_access_information(config.refresh_token)
+        self.sub = self.reddit.get_subreddit(config.subreddit)
+
+    def authenticate(self):
+        access_information = self.reddit.refresh_access_information(self.refresh_token)
         self.reddit.set_access_credentials(**access_information)
 
-        self.api = XWingAPI(config.api_base_url)
-
-        self.sub = self.reddit.get_subreddit(config.subreddit)
-        self.posts = self.sub.get_hot(limit=config.post_limit)
-
-        self.stats =  ['skill', 'attack', 'energy', 'range', 'agility', 'hull', 'shield', 'points']
-
-        self.card_limit = config.card_limit
-        self.debug = config.debug
+    def get_posts(self):
+        return self.sub.get_hot(limit=self.post_limit)
 
     def replied_to(self, obj):
         replies = []
@@ -75,7 +86,11 @@ class XWingTMGCardBot:
 
         return statline
     def render_card_text(self, card):
-        replacements = { '{STRONG}|{/STRONG}' : '**', '{EM}|{/EM}' : '*', '{BR}' : '' }
+        replacements = {
+            '{STRONG}|{/STRONG}' : '**',
+            '{EM}|{/EM}' : '*',
+            '{BR}' : ''
+        }
         text = card['text']
         for pattern, repl in replacements.iteritems():
             text = re.sub(pattern, repl, text)
@@ -136,13 +151,15 @@ class XWingTMGCardBot:
         if self.debug:
             print comment
             return
-
+        submit = None
         if type(obj) == praw.objects.Comment:
-            return obj.reply(comment)
+            submit = obj.reply
         elif type(obj) == praw.objects.Submission:
-            return obj.add_comment(comment)
+            submit = obj.add_comment
         else:
             raise TypeException('Object not submission or comment')
+
+        submit(comment)
 
     def process(self, obj):
         try:
@@ -157,14 +174,15 @@ class XWingTMGCardBot:
                 comment = self.build_comment(obj)
                 if comment:
                     self.post_comment(obj, comment)
-                    
+
         except Exception:
             print 'Unable to process: ' + str(obj)
             if self.debug:
                 raise
 
     def mash_go(self):
-        for post in self.posts:
+        self.authenticate()
+        for post in self.get_posts():
             self.process(post)
 
 if __name__ == '__main__':
