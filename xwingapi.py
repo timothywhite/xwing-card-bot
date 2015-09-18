@@ -9,10 +9,10 @@ class XWingAPI:
 
     def get_card(self, tag):
         filters = {
-            'type': ('get_upgrade_type', 'name'),
+            'type': ('get_upgrade_type', ('name', 'canonical')),
             'faction': ('get_faction', 'canonical')
         }
-        cards = filter(lambda c: self.compare(tag['card'], c), self.get_cards())
+        cards = filter(lambda c: self.compare(tag['card'], c, ('name', 'canonical')), self.get_cards())
         filtered_cards = cards
 
         for filter_type, (getter, cmp_prop) in filters.iteritems():
@@ -90,5 +90,7 @@ class XWingAPI:
     def get_upgrades(self):
         return self.get_objs('upgrade')
 
-    def compare(self, name, card, prop = 'name'):
-        return card[prop].lower() == name.lower()
+    def compare(self, value, card, prop):
+        if not hasattr(prop, '__iter__'):
+            prop = [prop]
+        return reduce(lambda p, prop: p or card[prop].lower() == value.lower(), prop, False)
